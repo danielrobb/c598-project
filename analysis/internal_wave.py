@@ -2,8 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.integrate import solve_ivp
-from scipy.fftpack import diff as psdiff
+
 
 def calc_c0(gp, h1, h2):
     return np.sqrt(gp * h1 * h2 / (h1 + h2))
@@ -14,32 +13,33 @@ def calc_alpha(gp, h1, h2):
 def calc_beta(gp, h1, h2):
     return calc_c0(gp, h1, h2) * h1 * h2 / 6.
 
-def kdv(t, u, params):
+def kdv(u, params):
     """The KdV equation discretized in x."""
     p = params
     k, L, c0, alpha, beta, diss_coeff = (p['k'], p['L'], p['c0'], p['alpha'], p['beta'], p['diss_coeff'])
     uhat = np.fft.fft(u)
     diss = np.real(diss_coeff * np.fft.ifft(np.abs(k)**0.5 * (-1 + np.sign(k)) * uhat))
-    ux = psdiff(u, period=L)
-    uxxx = psdiff(u, period=L, order=3)
+    ux = np.real(np.fft.ifft(1j * k * uhat))
+    uxxx = np.real(np.fft.ifft(-1j * k**3 * uhat))
     dudt = -c0*ux -alpha*u*ux - beta*uxxx + diss
     return dudt
 
-def rk4(f, t, y, dt, c):
-    k1 = f(t, y, c) 
-    k2 = f(t + dt/2., y + dt/2. * k1, c)
-    k3 = f(t + dt/2., y + dt/2. * k2, c)
-    k4 = f(t + dt, y + dt * k3, c)
+def rk4(f, y, dt, c):
+    k1 = f(y, c) 
+    k2 = f(y + dt/2. * k1, c)
+    k3 = f(y + dt/2. * k2, c)
+    k4 = f(y + dt * k3, c)
     return y + dt/6. * (k1 + 2*k2 + 2*k3 + k4)
 
 def solve_kdv(y0, dt, t_span, t_eval, params):
+    y = np.empty_like(y0)
     t0, tf = t_span
     t, y = (t0, y0)
     nt, nx = (len(t_eval), len(y0))
     sol = np.zeros((nt, nx))
     id_out = idt = 0
     while t < tf:
-        y = rk4(kdv, t, y, dt, params)
+        y = rk4(kdv, y, dt, params)
         if np.isclose(t, t_eval[id_out], atol=dt/2):
             print_diagnostics(idt, id_out, dt, t, y)
             sol[id_out, :] = y
@@ -53,7 +53,8 @@ def wrap_solution(sol):
     return sol[:, :int(nx/2)] + np.flip(sol[:, int(nx/2):], axis=1)
 
 def print_diagnostics(idt, id_out, dt, t, u):
-    message = f'iteration: {idt}, output: {id_out}, dt: {dt:.5f}, time: {t:.2f}, min_u: {np.min(u):.5f}, max_u: {np.max(u):.5f}'
+    message = f'iteration: {idt}, output: {id_out}, dt: {dt:.5f},' \
+              + f'time: {t:.2f}, min_u: {np.min(u):.5f}, max_u: {np.max(u):.5f}'
     print(message)    
 
 if __name__ == "__main__":
@@ -72,7 +73,7 @@ if __name__ == "__main__":
     diss_coeff = 0.5 * np.sqrt(0.5 * nu * c0) * (h1 + h2) / (h1 * h2)
     print(f'c0: {c0}, alpha: {alpha}, beta: {beta}, diss_coeff: {diss_coeff}')
     # Grid
-    nx = 512
+    nx = 256
     dx = L / nx
     x = np.linspace(0.,L, nx+1)
     x = x[:nx]  
