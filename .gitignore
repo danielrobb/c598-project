@@ -1,6 +1,8 @@
 fig/
 sup/
 data/
+slides/fig/
+slides/vid/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -164,12 +164,12 @@ if __name__ == "__main__":
     print(f'T/4 = {T/4} seconds')
     # Grid
     xmin, xmax = (0., 12.)
-    tmin, tmax = (0., 300.)
+    tmin, tmax = (0., 600.)
     nx = 512
-    #nout = 600
-    #t_out = np.linspace(tmin, tmax, nout)
-    t_out = np.arange(tmin, tmax + T/4, T/4)
+    nout = 1200
+    t_out = np.linspace(tmin, tmax, nout)
+    #t_out = np.arange(tmin, tmax + T/4, T/4)
     m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out,
-                 gp=gp, h1=h1, h2=h2, theta=theta, cfl=0.2)
+                 gp=gp, h1=h1, h2=h2, theta=theta, cfl=1.)
     m.run()
-    m.to_csv('../data/horn_58_5_T4.csv')
+    m.to_csv('../data/horn_58_5.csv')

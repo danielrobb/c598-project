@@ -20,7 +20,7 @@ for i, t in enumerate(ts):
     ax.set_ylim(-5, 5)
     ax.set_xlim(0, 6)
     ax.text(0.02, 0.98, f'$t =$' +  f' {t:.0f}', va='top', transform=ax.transAxes)
-    filename = f'../fig/horn_{i:03d}.png'
+    filename = f'../fig/horn_{i:04d}.png'
     plt.tight_layout()
     plt.savefig(filename, dpi=400)
     print(f'saving {filename}')
