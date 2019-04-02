@@ -1,9 +1,11 @@
 """
-Korteweg–de Vries equation solver.
+Korteweg–de Vries equation solver for internal waves.
 
 """
 
 import numpy as np
+import pandas as pd
+import xarray as xr
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -15,7 +17,11 @@ class KdVModel(object):
                  x_span=None,
                  t_span=None,
                  t_out=None,
-                 cfl=1.):
+                 gp=None,
+                 h1=None,
+                 h2=None,
+                 theta=None,
+                 cfl=1.,):
         self.nx = nx
         self.xmin = x_span[0]
         self.xmax = x_span[1]
@@ -29,12 +35,18 @@ class KdVModel(object):
         self.dx = self.L / nx
         self.x = np.arange(0., self.L, self.dx)
         # Coefficients
-        self.c0 = 0.
-        self.alpha1 = 1. 
-        self.alpha2 = 0. 
-        self.beta = 0.022 ** 2 
-        #self.dt = self.cfl * (self.dx)**3 / (self.c0) ** 3 
-        self.dt = 9.e-6
+        self.gp = gp
+        self.h1 = h1
+        self.h2 = h2
+        self.theta = theta
+        self._calc_c0()
+        self._calc_alpha1()
+        self._calc_alpha2()
+        self._calc_beta()
+        self._calc_diss_coeff()
+        # Time
+        self.dt = 0.001
+        #self.dt = self.dx**3 / self.c0**3 * self.cfl
         self.nt = int(np.ceil(self.tmax/self.dt))
         self.idt = 0
         # Wave number
@@ -43,8 +55,16 @@ class KdVModel(object):
         kr = -1*kr[::-1]
         self.k = (2.*np.pi/self.L)*np.concatenate((kl, kr))
         # Initial conditions
-        self.u = np.cos(np.pi * self.x)
-
+        u0 = np.empty_like(self.x)
+        idx = np.arange(0, int(self.nx/2))
+        eta0 = np.tan(theta) * (self.L/4)
+        m = eta0 / (self.L/4)
+        x0 = self.L/4
+        u0[idx] = m * (self.x[idx] - x0) 
+        idx = np.arange(int(self.nx/2), self.nx) 
+        u0[idx] = -m * (self.x[idx] - 3*x0)
+        self.u = 0.5 * u0
+        # Initialize u_out array
         dtype = np.float64
         shape = (self.nout, self.nx)
         self.u_out = np.zeros(shape, dtype)
@@ -52,32 +72,29 @@ class KdVModel(object):
     def run(self):
         """Main loop."""
         t = self.tmin
-        while(t < self.tmax):
-            if np.isclose(t, self.t_out[self.id_out], atol=self.dt/2.):
-                self._print_diagnostics()
-                self.u_out[self.id_out, :] = self.u 
-                self.id_out += 1
-            self._stepforward()
-            self.idt += 1
-            t += self.dt
+        try:
+            while t < self.tmax:
+                if np.isclose(t, self.t_out[self.id_out], atol=self.dt/2.):
+                    self._print_diagnostics()
+                    self.u_out[self.id_out, :] = self.u 
+                    self.id_out += 1
+                self._stepforward()
+                self.idt += 1
+                t += self.dt
+        except:
+            print('foo')
+        self.wrap_solution()
 
-    def _print_diagnostics(self):
-        idt = self.idt
-        id_out = self.id_out
-        dt = self.idt
-        umin = np.min(self.u)
-        umax = np.max(self.u)
-        t = self.t_out[self.id_out]
-        message = f'iteration: {idt}, output: {id_out}, dt: {dt:.5f},' \
-                  + f'time: {t:.2f}, min_u: {umin:.5f}, max_u: {umax:.5f}'
-        print(message)    
+    def wrap_solution(self):
+        self.sol = self.u_out[:, :int(nx/2)] + np.flip(self.u_out[:, int(nx/2):], axis=1)
 
     def _kdv(self, u):
         """KdV equation discretized in x."""
         uhat = np.fft.fft(u)
         ux = np.real(np.fft.ifft(1j * self.k * uhat))
         uxxx = np.real(np.fft.ifft(-1j * self.k**3 * uhat))
-        dudt = -1.*(self.c0 + self.alpha1*u + self.alpha2*u**2)*ux - self.beta*uxxx
+        diss = np.real(self.diss_coeff * np.fft.ifft(np.abs(self.k)**0.5 * (-1 + np.sign(self.k)) * uhat))
+        dudt = -1.*(self.c0 + self.alpha1*u + self.alpha2*u**2)*ux - self.beta*uxxx + diss
         return dudt
     
     def _rk4(self, u):
@@ -93,34 +110,66 @@ class KdVModel(object):
         """Step forward."""
         self.u = self._rk4(self.u)
 
-    def to_csv(self, filename='kdv_out.csv'):
-        """Save model results to a csv."""
+    def _calc_c0(self):
+         gp, h1, h2 = (self.gp, self.h1, self.h2)
+         self.c0 = np.sqrt(gp * h1 * h2 / (h1 + h2))
+     
+    def _calc_alpha1(self):
+        c0, h1, h2 = (self.c0, self.h1, self.h2)
+        self.alpha1 = 1.5 * c0 * (h1 - h2) / (h1 * h2)
 
+    def _calc_alpha2(self):
+        self.alpha2 = 0.
+    
+    def _calc_beta(self):
+         c0, h1, h2 = (self.c0, self.h1, self.h2)
+         self.beta = c0 * h1 * h2 / 6.
+
+    def _calc_diss_coeff(self):
+        nu = 1.e-6
+        c0, h1, h2 = (self.c0, self.h1, self.h2)
+        self.diss_coeff = 0.5 * np.sqrt(0.5 * nu * c0) * (h1 + h2) / (h1 * h2)
+
+    def to_csv(self, filename='out.csv'):
+        """Save model results to a csv."""
+        u = self.sol.flatten('F')
+        t = np.tile(self.t_out, (int(self.nx/2)))
+        x = np.repeat(self.x[:int(self.nx/2)], (len(self.t_out)))
+        data = {'t': t, 'x': x, 'u': u}
+        df = pd.DataFrame(data)
+        df.to_csv(filename, index=False, float_format='%.5f')
+
+    def _print_diagnostics(self):
+        idt = self.idt
+        id_out = self.id_out
+        dt = self.dt
+        umin = np.min(self.u)
+        umax = np.max(self.u)
+        t = self.t_out[self.id_out]
+        message = f'iteration: {idt}, output: {id_out}, dt: {dt:.5f},' \
+                  + f'time: {t:.2f}, min_u: {umin:.5f}, max_u: {umax:.5f}'
+        print(message)    
 
 if __name__ == "__main__":
-    xmin, xmax = (0., 2.)
-    tmin, tmax = (0., 3.6/np.pi)
+    # Constants
+    H = 0.29
+    h2 = 0.058
+    h1 = H - h2
+    theta = 0.5 * np.pi / 180.
+    g = 9.8
+    gp = g * 20. / 1000.
+    c = np.sqrt(gp * h1 * h2 / (h1 + h2))
+    L = 6
+    T = 2 * L / c
+    print(f'T/4 = {T/4} seconds')
+    # Grid
+    xmin, xmax = (0., 12.)
+    tmin, tmax = (0., 300.)
     nx = 512
-    #t_out = np.array([tmin, np.pi**-1, tmax])
-    t_out = np.linspace(tmin, tmax, 100)
-    m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out)
+    #nout = 600
+    #t_out = np.linspace(tmin, tmax, nout)
+    t_out = np.arange(tmin, tmax + T/4, T/4)
+    m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out,
+                 gp=gp, h1=h1, h2=h2, theta=theta, cfl=0.2)
     m.run()
-    #m.save(filename=filename)
-    nt, nx = m.u_out.shape
-    sns.set_context('talk', font_scale=1.5)
-    figsize=(9, 6)
-    for i in range(nt):
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.plot(m.x, m.u_out[i, :])
-        ax.set_xlabel('$x$')
-        ax.set_ylabel('$u(x, t)$')
-        ax.set_ylim(-1.25, 3.25)
-        ax.set_xlim(0, 2)
-        ax.text(0.02, 0.98, f'$t =$' +  f' {t_out[i]:.2f}', va='top', transform=ax.transAxes)
-        filename = f'../fig/zabusky_{i:03d}.png'
-        plt.tight_layout()
-        plt.savefig(filename, dpi=400)
-        plt.close()
-
-
-    
+    m.to_csv('../data/horn_58_5_T4.csv')
