@@ -50,7 +50,7 @@ class KdVModel(object):
         self._init_variables()
         self._init_conditions()
         self._calc_v()
-        self._plot_check()
+        #self._plot_check()
 
     def run(self):
         """Main loop."""
@@ -80,10 +80,6 @@ class KdVModel(object):
         self._build_coeff_c()
         self._build_matrix_C()
         self._update_mom()
-        #self.phi[self.idt, -2] = self.phi[self.idt, 0]
-        #self.phi[self.idt, -1] = self.phi[self.idt, 1]
-        #self.mom[self.idt, -2] = self.mom[self.idt, 0]
-        #self.mom[self.idt, -1] = self.mom[self.idt, 1]
 
     def _update_phi(self):
         """Update velocity potential phi."""
@@ -243,10 +239,10 @@ if __name__ == "__main__":
     xmin, xmax = (-0.5, 1.5)
     nx = 4096
     dx = 1/nx
-    nout = 200
+    nout = 300
     k0 = 512
-    dt = dx 
-    tmin, tmax = (0., 4.5)
+    dt = dx  
+    tmin, tmax = (0, 4.)
     t_out = np.linspace(tmin, tmax, nout)
     vamp = 0.2
     vmids = [1., 0.5]

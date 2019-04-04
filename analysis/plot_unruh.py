@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-filename = '../data/unruh.csv'
+filename = '../data/unruh_512_0.5.csv'
 df = pd.read_csv(filename)
 df.phi = df.phi_r
 ts = pd.unique(df.t)
@@ -20,7 +20,7 @@ for i, t in enumerate(ts):
     ax.set_ylim(-0.15, 0.15)
     ax.set_xlim(df.x.min(), df.x.max())
     ax.text(0.02, 0.98, f'$t =$' +  f' {t:.2f}', va='top', transform=ax.transAxes)
-    filename = f'../fig/unruh2_{i:04d}.png'
+    filename = f'../fig/unruh512_{i:04d}.png'
     plt.tight_layout()
     plt.savefig(filename, dpi=400)
     print(f'saving {filename}')
