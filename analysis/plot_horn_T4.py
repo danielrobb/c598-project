@@ -16,7 +16,7 @@ figsize=(9, 6)
 fig, ax = plt.subplots(nrows=4, ncols=2, figsize=figsize, sharex=True, sharey=True)
 
 labels = ['0', '$T_i/4$', '$T_i/2$', '$3/4 \, T_i$', '$T_i$', '$5/4 T_i$', '$3/2 T_i$', '$7/4 T_i$']
-for a, t, label in zip(ax.flat, ts, labels):
+for a, t, label in zip(ax.transpose().flat, ts, labels):
     df.loc[df.t == t].plot(ax=a, x='x', y='u', legend=False)
     a.axhline(xmin=0, xmax=6, y=0, color='black', linestyle=':', zorder=0)
     #ax.set_xlabel('$x \; \mathregular{(m)}$')
@@ -29,7 +29,7 @@ for a in ax[:, 0].flat:
     a.set_ylabel('$\eta \; \mathregular{(cm)}$')
 for a in ax[-1, :].flat:
     a.set_xlabel('$x \; \mathregular{(m)}$')
-filename = f'../fig/horn_T4.png'
+filename = f'../fig/horn_T42.png'
 plt.tight_layout(h_pad=0)
 plt.savefig(filename, dpi=400)
 print(f'saving {filename}')

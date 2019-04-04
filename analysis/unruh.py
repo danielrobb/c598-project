@@ -18,7 +18,9 @@ class KdVModel(object):
                  x_span=None,
                  t_span=None,
                  t_out=None,
-                 dt=None):
+                 dt=None,
+                 vmid=None,
+                 vamp=None):
         self.nx = nx
         self.xmin = x_span[0]
         self.xmax = x_span[1]
@@ -26,11 +28,13 @@ class KdVModel(object):
         self.tmax = t_span[1]
         self.t_out = t_out
         self.dt = dt
+        self.vmid = vmid
+        self.vamp = vamp
         self.id_out = 0
         self.nout = len(self.t_out)
         self.L = self.xmax - self.xmin
         self.dx = self.L / nx
-        self.x = np.arange(0, self.L, self.dx)
+        self.x = np.arange(self.xmin, self.xmax, self.dx)
         # Coefficients
         # Time
         self.nt = int(np.ceil(self.tmax/self.dt))
@@ -178,7 +182,9 @@ class KdVModel(object):
 
     def _calc_v(self):
         x = self.x
-        self.v =  0.2 * np.tanh(24*np.cos(2*np.pi*(x-0.25))+23.) - 1.
+        self.v =  self.vamp * np.tanh(24*np.cos(2*np.pi*(x-0.25))+23.) - self.vmid
+        ind = np.where(self.x < 0.)[0]
+        self.v[ind] = self.vamp - self.vmid
      
     def _calc_phi0(self):
         x = self.x
@@ -209,7 +215,7 @@ class KdVModel(object):
         t = np.tile(self.t_out, self.nx)
         x = np.repeat(self.x, (len(self.t_out)))
         print(phi.shape, t.shape, x.shape)
-        data = {'t': t, 'x': x, 'phi': np.real(phi)}
+        data = {'t': t, 'x': x, 'phi_r': np.real(phi), 'phi_i': np.imag(phi)}
         df = pd.DataFrame(data)
         df.to_csv(filename, index=False, float_format='%.5f')
 
@@ -234,14 +240,17 @@ class KdVModel(object):
 
 if __name__ == "__main__":
     # Grid
-    xmin, xmax = (0., 1.)
-    nx = 1024
+    xmin, xmax = (-0.5, 1.5)
+    nx = 4096
     dx = 1/nx
     nout = 200
     k0 = 512
     dt = dx 
     tmin, tmax = (0., 4.5)
     t_out = np.linspace(tmin, tmax, nout)
-    m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out,dt=dt)
-    m.run()
-    m.to_csv('../data/unruh.csv')
+    vamp = 0.2
+    vmids = [1., 0.5]
+    for vmid in vmids:
+        m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out,dt=dt, vmid=vmid, vamp=vamp)
+        m.run()
+        m.to_csv(f'../data/unruh_{nx}_{vmid}.csv')
