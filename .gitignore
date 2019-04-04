@@ -1,6 +1,8 @@
+.DS_Store
 fig/
 sup/
 data/
+slides/
 slides/fig/
 slides/vid/
 notebooks/
