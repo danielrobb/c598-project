@@ -18,7 +18,7 @@ class KdVModel(object):
                  t_span=None,
                  t_out=None,
                  dt=None,
-                 F=0.95,
+                 F=None,
                  R=0.35,
                  alpha=0.472,
                  beta=0.0154,
@@ -156,6 +156,9 @@ if __name__ == "__main__":
     dt = 5.e-3
     nout = 6
     t_out = np.linspace(tmin, tmax, nout)
-    m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out, dt=dt)
-    m.run()
-    m.to_csv('../data/melville.csv')
+
+    Fs = [1.2, 1.3, 1.4]
+    for F in Fs:
+        m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out, dt=dt, F=F)
+        m.run()
+        m.to_csv(f'../data/melville_{F:.1f}.csv')

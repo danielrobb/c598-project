@@ -5,7 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-filename = '../data/melville.csv'
+
+
+filename = '../data/melville_1.2.csv'
 df = pd.read_csv(filename)
 df.u = df.u 
 ts = pd.unique(df.t)
@@ -20,7 +22,7 @@ for i, t in enumerate(ts):
     ax.set_ylim(-0.5, 0.5)
     ax.set_xlim(-40, 40)
     ax.text(0.02, 0.98, f'$t =$' +  f' {t:.0f}', va='top', transform=ax.transAxes)
-    filename = f'../fig/melville_{i:04d}.png'
+    filename = f'../fig/melville_1.2_{i:04d}.png'
     plt.tight_layout()
     plt.savefig(filename, dpi=400)
     print(f'saving {filename}')
