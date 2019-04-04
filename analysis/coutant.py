@@ -83,7 +83,7 @@ class KdVModel(object):
         uhat = np.fft.fft(u)
         ux = np.real(np.fft.ifft(1j * self.k * uhat))
         uxxx = np.real(np.fft.ifft(-1j * self.k**3 * uhat))
-        dudt = -1.*(self.v - 1.)*ux 
+        dudt = -1.*(self.v - 1.)*ux + uxxx
         return dudt
     
     def _rk4(self, u):
@@ -136,16 +136,16 @@ class KdVModel(object):
 
 if __name__ == "__main__":
     # Constants
-    ul = 1.5
-    ur = 0.5
+    ul = 0.9
+    ur = 0.6
     x0 = 200.
     sigma = 100.
-    a = 1./sigma*2
+    a = 1./sigma*5
     npeaks = 3.
     # Grid
     xmin, xmax = (-600., 600.)
     tmin, tmax = (0., 1000.)
-    nx = 2028
+    nx = 1024
     nout = 10
     t_out = np.linspace(tmin, tmax, nout)
     m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out,
