@@ -6,6 +6,7 @@ topography in the presence of a current.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from numba import jit
 from datetime import datetime
 
 class WaveModel(object):
@@ -49,29 +50,24 @@ class WaveModel(object):
         """Main loop."""
         self.t = self.tmin
         start_time = datetime.now()
-        try:
-            while self.t < self.tmax:
-                if np.isclose(self.t, self.tout[self.id_out], atol=self.dt/2.):
-                    self._print_diagnostics()
-                    self.phi_out[self.id_out, :] = self.phi[self.idt, :]
-                    self.id_out += 1
-                self._stepforward()
-                self.idt += 1
-                self.t += self.dt
-        except:
-            print('Simulation finished: t > tmax')
-            elapsed_time = datetime.now() - start_time
-            print(f'elapse time: {elapsed_time}')
+        while(self.t < self.tmax-2*self.dt): 
+            self._stepforward()
+            if np.isclose(self.t, self.tout[self.id_out], atol=self.dt/2.):
+                self._print_diagnostics()
+                self.phi_out[self.id_out, :] = self.phi[self.idt, :]
+                self.id_out += 1
+            self.idt += 1
+            self.t += self.dt
+        print('Simulation finished: t > tmax')
+        elapsed_time = datetime.now() - start_time
+        print(f'elapsed time: {elapsed_time}')
 
     def _stepforward(self):
         """Step forward."""
-        # Velocity potential phi
         self._build_coeff_b()
         self._build_matrix_B()
         self._update_phi()
-        # Dispersion term f2
         self._update_f2()
-        # Momentum mom
         self._build_coeff_c()
         self._build_matrix_C()
         self._update_mom()
@@ -96,42 +92,36 @@ class WaveModel(object):
     def _build_coeff_b(self):
         """Build coefficient b."""
         a, m = (self.a, self.idt)
-        for i in range(self.nx):
-            (i_prev, i_next) = self._get_prev_next(i)
-            self.b[m, i] = (self.phi[m, i]
-                            - a*self.v[i]*(self.phi[m, i_next] - self.phi[m, i_prev])
-                            + self.dt * self.mom[m, i])
+        si = 1
+        ei = self.nx-1
+        self.b[m, si:ei] = (self.phi[m, si:ei] - a * self.v[si:ei]
+                         * (self.phi[m, si+1:ei+1] - self.phi[m, si-1:ei-1])
+                         + self.dt * self.mom[m, si:ei])
 
     def _build_coeff_c(self):
         """Build coefficient c."""
         a, m = (self.a, self.idt)
-        for i in range(self.nx):
-            (i_prev, i_next) = self._get_prev_next(i)
-            self.c[m, i] = (self.mom[m, i]
-                            - a*(self.v[i_next]*self.mom[m, i_next] - self.v[i_prev]*self.mom[m, i_prev])
-                            - self.dt * self.f2[m+1, i])
+        si = 1
+        ei = self.nx-1
+        self.c[m, si:ei] = (self.mom[m, si:ei]
+                        - a*(self.v[si+1:ei+1]*self.mom[m, si+1:ei+1] - self.v[si-1:ei-1]*self.mom[m, si-1:ei-1])
+                        - self.dt * self.f2[m+1, si:ei])
 
     def _build_matrix_B(self):
         """Build cyclic tridiagonal matrices B."""
-        self.B[self.nx-1, 0] = self.a * self.v[self.nx-1]
-        self.B[0, self.nx-1] = self.a * self.v[0] * -1.
-        for i in range(self.nx):
-            self.B[i, i] = 1.
-            if i > 0:
-                self.B[i, i-1] = self.a * self.v[i] * -1.
-            if i < self.nx-1:
-                self.B[i, i+1] = self.a * self.v[i]
+        nx = self.nx
+        a = self.a
+        v = self.v
+        B = build_B(nx, a, v)
+        self.B = B.copy()
 
     def _build_matrix_C(self):
         """Build cyclic tridiagonal matrices C."""
-        self.C[self.nx-1, 0] = self.a * self.v[0]
-        self.C[0, self.nx-1] = self.a * self.v[self.nx-1] * -1.
-        for i in range(self.nx):
-            self.C[i, i] = 1.
-            if i > 0:
-                self.C[i, i-1] = self.a * self.v[i-1] * -1.
-            if i < self.nx-1:
-                self.C[i, i+1] = self.a * self.v[i+1]
+        nx = self.nx
+        a = self.a
+        v = self.v
+        C = build_C(nx, a, v)
+        self.C = C.copy()
 
     def _get_prev_next(self, i):
         """Return left and right spatial points on a periodic domain."""
@@ -146,24 +136,18 @@ class WaveModel(object):
         """Initialize variables."""
         dtype = np.dtype(np.complex128)
         shape = (self.nt, self.nx)
-        # Velocity potential
         self.phi = np.zeros(shape, dtype)
         self.phi0 = np.zeros(self.nx, dtype)
         self.mom = np.zeros(shape, dtype)
         self.mom0 = np.zeros(self.nx, dtype)
         self.B = np.zeros((self.nx, self.nx), dtype)
-        # Momentum
         self.mom  = np.zeros(shape, dtype)
         self.C = np.zeros((self.nx, self.nx), dtype)
-        # Coefficients
         self.a = self.dt / (4 * self.dx)
         self.b  = np.zeros(shape, dtype)
         self.c  = np.zeros(shape, dtype)
-        # Action on phi
         self.f2 = np.zeros(shape, dtype)
-        # Background velocity
         self.v = np.zeros(self.nx, dtype)
-        # Output
         shape = (self.nout, self.nx)
         self.phi_out = np.zeros(shape, dtype)
 
@@ -179,8 +163,6 @@ class WaveModel(object):
         self.v = (0.5*(self.Fr_max - self.Fr_min)
                   * np.tanh(24*np.cos(2*np.pi*(x-0.25))+23.)
                   - 0.5*(self.Fr_max + self.Fr_min))
-        ind = np.where(self.x < 0)[0]
-        self.v[ind] = -self.Fr_min
 
     def _calc_k(self):
         """Calculate wave numbers."""
@@ -245,14 +227,42 @@ class WaveModel(object):
         plt.plot(self.x, self.v)
         plt.show()
 
+@jit(nopython=True)
+def build_B(nx, a, v):
+    dtype = np.dtype(np.float64)
+    B = np.zeros((nx, nx), dtype)
+    B[nx-1, 0] = a * v[nx-1]
+    B[0, nx-1] = a * v[0] * -1.
+    for i in range(nx):
+        B[i, i] = 1.
+        if i > 0:
+            B[i, i-1] = a * v[i] * -1.
+        if i < nx-1:
+            B[i, i+1] = a * v[i]
+    return B
+
+@jit(nopython=True)
+def build_C(nx, a, v):
+    dtype = np.dtype(np.float64)
+    C = np.zeros((nx, nx), dtype)
+    C[nx-1, 0] = a * v[0]
+    C[0, nx-1] = a * v[nx-1] * -1.
+    for i in range(nx):
+        C[i, i] = 1.
+        if i > 0:
+            C[i, i-1] = a * v[i-1] * -1.
+        if i < nx-1:
+            C[i, i+1] = a * v[i+1]
+    return C
+
 if __name__ == "__main__":
-    xmin, xmax = (-0.5, 1.5)
+    xmin, xmax = (0., 1.)
     tmin, tmax = (0., 4.)
-    Fr_min, Fr_max = (0.3, 0.7)
-    nx = 4096
+    Fr_min, Fr_max = (0.35, 0.75)
+    nx = 1024
     dx = (xmax - xmin)/nx
     dt = dx
-    nout = 500
+    nout = 100
     tout = np.linspace(tmin, tmax, nout)
     m = WaveModel(nx=nx,
                   dt=dt,
@@ -262,4 +272,4 @@ if __name__ == "__main__":
                   Fr_span=(Fr_min, Fr_max),
                   plot_initial_conditions=True)
     m.run()
-    m.to_csv(f'../data/wavecurrent_{nx}.csv')
+    m.to_csv(f'../data/wavecurrent_fast_{nx}.csv')
