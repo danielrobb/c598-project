@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-fileroot = 'wavecurrent_4096'
+fileroot = 'wavecurrent_2048_0.45'
 filename = f'../data/{fileroot}.csv'
 df = pd.read_csv(filename)
 ts = pd.unique(df.t)

@@ -193,8 +193,8 @@ class WaveModel(object):
         """Calculate the initial velocity potential."""
         x = self.x
         x0 = 0.3
-        sigma = 0.025
-        amp = 0.1
+        sigma = 0.05
+        amp = 0.025
         self.phi0 = amp * np.exp(-0.5*((x-x0)/sigma)**2 + 8j*(x-x0)/sigma)
 
     def _calc_mom0(self):
@@ -246,20 +246,23 @@ class WaveModel(object):
         plt.show()
 
 if __name__ == "__main__":
-    xmin, xmax = (-0.5, 1.5)
+    xmin, xmax = (0, 1.)
     tmin, tmax = (0., 4.)
-    Fr_min, Fr_max = (0.3, 0.7)
-    nx = 4096
+    Fr_min, Fr_max = (0.2, 0.45)
+    Fr_maxs = np.array([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2])
+    Fr_mins = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
+    nx = 2048
     dx = (xmax - xmin)/nx
     dt = dx
     nout = 500
     tout = np.linspace(tmin, tmax, nout)
-    m = WaveModel(nx=nx,
-                  dt=dt,
-                  tout=tout,
-                  x_span=(xmin, xmax),
-                  t_span=(tmin, tmax),
-                  Fr_span=(Fr_min, Fr_max),
-                  plot_initial_conditions=True)
-    m.run()
-    m.to_csv(f'../data/wavecurrent_{nx}.csv')
+    for Fr_min, Fr_max in zip(Fr_mins, Fr_maxs):
+        m = WaveModel(nx=nx,
+                      dt=dt,
+                      tout=tout,
+                      x_span=(xmin, xmax),
+                      t_span=(tmin, tmax),
+                      Fr_span=(Fr_min, Fr_max),
+                      plot_initial_conditions=False)
+        m.run()
+        m.to_csv(f'../data/wavecurrent_{nx}_{Fr_min:0.2f}_{Fr_max:0.2f}.csv')
