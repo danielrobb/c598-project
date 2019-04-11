@@ -11,7 +11,7 @@ def calc_k(x, L=1):
     k = (2.*np.pi/L)*np.concatenate((kl, kr))
     return k
 
-run = 'wavecurrent_2048_0.4'
+run = 'wavecurrent_2048_0.20_0.60'
 filename = f'../data/{run}.csv'
 df = pd.read_csv(filename)
 
@@ -28,7 +28,7 @@ omega = calc_k(t)
 sns.set_context('paper')
 fig, ax = plt.subplots(nrows=2, figsize=(8, 5))
 #iss = np.arange(0, 498, 70)
-iss = [0, 200]
+iss = [0, 170]
 for i in iss:
     ax[0].plot(x, np.real(u[i, :]))
     ax[1].plot(k, np.absolute(np.fft.fft(np.real(u[i, :]))))
