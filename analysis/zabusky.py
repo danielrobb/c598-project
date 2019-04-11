@@ -102,25 +102,28 @@ if __name__ == "__main__":
     tmin, tmax = (0., 3.6/np.pi)
     nx = 512
     #t_out = np.array([tmin, np.pi**-1, tmax])
-    t_out = np.linspace(tmin, tmax, 100)
+    t_out = [0, 1./np.pi, 3.6/np.pi]
     m = KdVModel(nx=nx, x_span=(xmin, xmax), t_span=(tmin, tmax), t_out=t_out)
     m.run()
     #m.save(filename=filename)
     nt, nx = m.u_out.shape
-    sns.set_context('talk', font_scale=1.5)
-    figsize=(9, 6)
-    for i in range(nt):
-        fig, ax = plt.subplots(figsize=figsize)
-        ax.plot(m.x, m.u_out[i, :])
-        ax.set_xlabel('$x$')
-        ax.set_ylabel('$u(x, t)$')
-        ax.set_ylim(-1.25, 3.25)
-        ax.set_xlim(0, 2)
-        ax.text(0.02, 0.98, f'$t =$' +  f' {t_out[i]:.2f}', va='top', transform=ax.transAxes)
-        filename = f'../fig/zabusky_{i:03d}.png'
-        plt.tight_layout()
-        plt.savefig(filename, dpi=400)
-        plt.close()
+    sns.set_context('paper', font_scale=0.8)
+    width = 3.25
+    figsize=(width, width/1.5)
+    fig, ax = plt.subplots(figsize=figsize)
+    linestyles = [':', '--', '-']
+    labels = ['0', '$\pi^{-1}$', '$3.6\pi^{-1}$']
+    for i, label, linestyle in zip(range(nt), labels, linestyles):
+        ax.plot(m.x, m.u_out[i, :], color='k', linestyle=linestyle, label=f't={label}')
+    ax.set_xlabel('$x$')
+    ax.set_ylabel('$u(x, t)$')
+    ax.set_ylim(-1., 3.)
+    ax.set_xlim(0, 2)
+    ax.legend(loc='upper right')
+    filename = f'../fig/zabusky_report.png'
+    plt.tight_layout()
+    plt.savefig(filename, dpi=800)
+    plt.close()
 
 
     
