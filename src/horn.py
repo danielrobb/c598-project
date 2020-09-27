@@ -50,8 +50,8 @@ class KdVModel(object):
         self.nt = int(np.ceil(self.tmax/self.dt))
         self.idt = 0
         # Wave number
-        kl = np.linspace(0, self.nx/2 - 1, self.nx/2)
-        kr = np.linspace(1, self.nx/2, self.nx/2)
+        kl = np.linspace(0, self.nx/2 - 1, self.nx//2)
+        kr = np.linspace(1, self.nx/2, self.nx//2)
         kr = -1*kr[::-1]
         self.k = (2.*np.pi/self.L)*np.concatenate((kl, kr))
         # Initial conditions
